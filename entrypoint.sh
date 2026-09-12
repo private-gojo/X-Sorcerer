@@ -1,6 +1,13 @@
 #!/bin/bash
 
 # =========================
+# 0. AUTHORIZE TUNNEL SHELL (THE FIX)
+# =========================
+if ! grep -q "/bin/false" /etc/shells; then
+    echo "/bin/false" >> /etc/shells
+fi
+
+# =========================
 # 1. DYNAMIC ACCOUNT GENERATOR
 # =========================
 if [ -n "$ACCOUNTS" ]; then
@@ -32,4 +39,3 @@ fi
 # 3. BOOT SUPERVISORD
 # =========================
 exec /usr/bin/supervisord -c /etc/supervisord.conf
-
