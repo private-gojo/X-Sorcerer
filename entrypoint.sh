@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # =========================
-# 0. AUTHORIZE TUNNEL SHELL (THE FIX)
+# AUTHORIZE TUNNEL SHELL (THE FIX)
 # =========================
 if ! grep -q "/bin/false" /etc/shells; then
     echo "/bin/false" >> /etc/shells
 fi
 
 # =========================
-# 1. DYNAMIC ACCOUNT GENERATOR
+# DYNAMIC ACCOUNT GENERATOR
 # =========================
 if [ -n "$ACCOUNTS" ]; then
     IFS=',' read -ra ADDR <<< "$ACCOUNTS"
@@ -26,7 +26,7 @@ else
 fi
 
 # =========================
-# 2. DROPBEAR HOST KEYS
+# DROPBEAR HOST KEYS
 # =========================
 if [ ! -f /etc/dropbear/dropbear_rsa_host_key ]; then
     dropbearkey -t rsa -f /etc/dropbear/dropbear_rsa_host_key -s 2048
@@ -36,6 +36,8 @@ if [ ! -f /etc/dropbear/dropbear_ecdsa_host_key ]; then
 fi
 
 # =========================
-# 3. BOOT SUPERVISORD
+# VERIFY BADVPN VERSION (debug)
 # =========================
+badvpn-udpgw --version
+
 exec /usr/bin/supervisord -c /etc/supervisord.conf
