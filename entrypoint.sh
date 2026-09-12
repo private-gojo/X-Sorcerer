@@ -1,23 +1,16 @@
 #!/bin/bash
 
 # ============================================================
-# GOJO X-SORCERER SSH+WS — ENTRYPOINT
+# GOJO SSH+WS RELAY — ENTRYPOINT (v2, nginx-fronted)
 # ============================================================
 
-# ------------------------------------------------------------
-# LABEL: 0. Authorize tunnel-only shell
-# Required so /bin/false is a valid login shell (tunnel-only
-# accounts, no interactive shell access) — kept from your setup
-# ------------------------------------------------------------
+# I authorize the tunnel-only shell first, same as before.
 if ! grep -q "/bin/false" /etc/shells; then
     echo "/bin/false" >> /etc/shells
 fi
 
-# ------------------------------------------------------------
-# LABEL: 1. Dynamic account generator
-# Reads ACCOUNTS env var (format: user1:pass1,user2:pass2)
-# Falls back to a default gojo:gojo account if unset
-# ------------------------------------------------------------
+# I generate accounts from the ACCOUNTS env var, or fall back
+# to my default gojo:gojo if nothing is set.
 if [ -n "$ACCOUNTS" ]; then
     IFS=',' read -ra ADDR <<< "$ACCOUNTS"
     for i in "${ADDR[@]}"; do
@@ -31,12 +24,7 @@ else
     echo "gojo:gojo" | chpasswd
 fi
 
-# ------------------------------------------------------------
-# LABEL: 2. Dropbear host keys
-# Regenerated on cold start since Cloud Run has no persistent
-# volume between instances — this is expected/normal, not a bug.
-# Adds ~1-2 seconds to boot time, not a factor in the crash-loop.
-# ------------------------------------------------------------
+# I generate dropbear host keys if they don't exist yet.
 if [ ! -f /etc/dropbear/dropbear_rsa_host_key ]; then
     dropbearkey -t rsa -f /etc/dropbear/dropbear_rsa_host_key -s 2048
 fi
@@ -44,17 +32,18 @@ if [ ! -f /etc/dropbear/dropbear_ecdsa_host_key ]; then
     dropbearkey -t ecdsa -f /etc/dropbear/dropbear_ecdsa_host_key -s 521
 fi
 
-# ------------------------------------------------------------
-# LABEL: 3. Verify badvpn-udpgw binary version (diagnostic)
-# Confirms exactly which build shipped in this image — logs
-# this on every boot so you can always check via Cloud Run logs
-# without needing shell access into the running container.
-# ------------------------------------------------------------
+# I substitute Cloud Run's injected PORT into my nginx template.
+# Cloud Run always sets this env var — I never hardcode the port
+# anywhere else so this stays portable across environments.
+export PORT="${PORT:-8080}"
+envsubst '${PORT}' < /etc/x-sorcerer/nginx.conf.template | sed "s/__PORT__/${PORT}/" > /etc/nginx/nginx.conf
+
 echo "=== [BOOT CHECK] badvpn-udpgw version ==="
 badvpn-udpgw --version
 echo "=========================================="
 
-# ------------------------------------------------------------
-# LABEL: 4. Boot supervisord (manages dropbear, proxy, badvpn)
-# ------------------------------------------------------------
+echo "=== [BOOT CHECK] nginx config test ==="
+nginx -t
+echo "======================================="
+
 exec /usr/bin/supervisord -c /etc/supervisord.conf
