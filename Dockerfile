@@ -39,3 +39,4 @@ RUN chmod +x /entrypoint.sh /etc/x-sorcerer/proxy.py
 EXPOSE 8080
 
 ENTRYPOINT ["/entrypoint.sh"]
+
