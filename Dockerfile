@@ -21,11 +21,11 @@ RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2024.85.tar.bz2 && \
     make PROGRAMS="dropbear" && \
     make PROGRAMS="dropbear" install
 
-# 2. Compile BadVPN (udpgw only para magaan)
+# 2. Compile BadVPN (with legacy CMake policy override)
 RUN git clone --depth 1 https://github.com/ambrop72/badvpn.git /tmp/badvpn && \
     mkdir -p /tmp/badvpn/build && \
     cd /tmp/badvpn/build && \
-    cmake .. -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1 && \
+    cmake .. -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1 && \
     make install
 
 # ============================================================
