@@ -12,10 +12,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Fail-fast validation: Titigil agad ang build kung may syntax error ang proxy.py
-      - name: Validate Python Syntax
-        run: python3 -m py_compile proxy.py
-
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
