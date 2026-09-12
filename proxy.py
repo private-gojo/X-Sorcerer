@@ -123,7 +123,7 @@ async def handle_client(client_reader, client_writer):
     try:
         # --------------------------------------------------------
         # LABEL: Safe handshake read
-        # FIX vs the GENERIC "camouflage" version: does NOT touch
+        # FIX vs the Gemini "camouflage" version: does NOT touch
         # asyncio's private `reader._buffer` attribute (unsupported
         # internal API — flagged previously as unsafe / matches a
         # real CPython bug report). Instead we accumulate into our
@@ -142,6 +142,10 @@ async def handle_client(client_reader, client_writer):
         header_end = raw.index(b"\r\n\r\n") + 4
         leftover = raw[header_end:]  # any client bytes that arrived right after the header
 
+        # LABEL: DEBUG — log exactly what was received, byte for byte.
+        # Temporary diagnostic: remove once the 503 cause is confirmed.
+        logging.info(f"RAW REQUEST from {ip}: {raw!r}")
+
         # LABEL: Accept "fake" WebSocket upgrades (NetMod / HTTP Injector style —
         # no Sec-WebSocket-Key validation, matches your client's actual behavior)
         if b"upgrade: websocket" in raw.lower():
@@ -151,11 +155,18 @@ async def handle_client(client_reader, client_writer):
                 b"Connection: Upgrade\r\n\r\n"
             )
             await client_writer.drain()
+            logging.info(f"Sent 101 response to {ip}, connecting to dropbear...")
         else:
+            logging.info(f"No websocket upgrade header found from {ip}, dropping")
             return
 
         # LABEL: Connect to local dropbear
-        ssh_reader, ssh_writer = await asyncio.open_connection("127.0.0.1", SSH_PORT)
+        try:
+            ssh_reader, ssh_writer = await asyncio.open_connection("127.0.0.1", SSH_PORT)
+            logging.info(f"Connected to dropbear on 127.0.0.1:{SSH_PORT} for {ip}")
+        except Exception as e:
+            logging.error(f"FAILED to connect to dropbear for {ip}: {e!r}")
+            return
 
         optimize_socket(client_writer.get_extra_info('socket'))
         optimize_socket(ssh_writer.get_extra_info('socket'))
