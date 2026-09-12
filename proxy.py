@@ -4,9 +4,6 @@ import os
 import socket
 import logging
 
-# =========================
-# DEBUGGING LOGGER SETUP
-# =========================
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - [X-PROXY] - %(levelname)s - %(message)s',
@@ -15,51 +12,50 @@ logging.basicConfig(
 
 LISTEN_PORT = int(os.environ.get("PORT", "8080"))
 SSH_PORT = 2224
-# Pinaliit ang buffer para iwas ping spike / bufferbloat burst
-BUF_SIZE = 8192 
 
 def optimize_socket(sock: socket.socket):
     if not sock: return
     try:
+        # VERIFIED FIX: Removed SO_RCVBUF/SO_SNDBUF limitations. 
+        # Only disabling Nagle's algorithm for ping optimization.
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUF_SIZE)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, BUF_SIZE)
     except Exception as e:
         logging.warning(f"Socket optimization warning: {e}")
 
 async def relay(reader, writer, direction):
     try:
         while True:
-            data = await reader.read(BUF_SIZE)
+            # Reverted to standard 64KB read chunks for high-throughput scaling
+            data = await reader.read(65536)
             if not data:
-                logging.info(f"Connection closed by {direction}")
                 break
             writer.write(data)
             await writer.drain()
-    except asyncio.TimeoutError:
-        logging.warning(f"Relay timeout on {direction}")
-    except ConnectionResetError:
-        logging.error(f"Connection reset by peer on {direction}")
-    except Exception as e:
-        logging.error(f"Relay error ({direction}): {e}")
+    except Exception:
+        pass
     finally:
         writer.close()
 
 async def handle_client(client_reader, client_writer):
     addr = client_writer.get_extra_info('peername')
+    
+    # VERIFIED FIX: Silently drop Google Cloud Health Checks (no logs, no errors)
+    if addr and addr[0] == '169.254.169.126':
+        client_writer.close()
+        return
+
     logging.info(f"New client connected from {addr}")
     
     try:
         raw = b""
-        # Added explicit timeout para hindi mag-hang ang thread
         while b"\r\n\r\n" not in raw:
-            chunk = await asyncio.wait_for(client_reader.read(8192), timeout=5.0)
+            chunk = await asyncio.wait_for(client_reader.read(8192), timeout=3.0)
             if not chunk:
-                raise ValueError("Incomplete handshake payload")
+                return # Client disconnected during handshake
             raw += chunk
             if len(raw) > 16384:
-                raise ValueError("Payload size limit exceeded")
+                return # Payload too large
 
         if b"Upgrade: websocket" in raw or b"upgrade: websocket" in raw:
             response = (
@@ -69,9 +65,7 @@ async def handle_client(client_reader, client_writer):
             )
             client_writer.write(response)
             await client_writer.drain()
-            logging.info(f"WebSocket handshake successful for {addr}")
         else:
-            logging.warning(f"Invalid payload/Not a websocket request from {addr}")
             client_writer.write(b"HTTP/1.1 403 Forbidden\r\n\r\n")
             await client_writer.drain()
             client_writer.close()
@@ -89,7 +83,7 @@ async def handle_client(client_reader, client_writer):
         )
 
     except asyncio.TimeoutError:
-        logging.error(f"Handshake timeout from {addr}")
+        pass # Silently ignore timeout scanners
     except Exception as e:
         logging.error(f"Client handler error ({addr}): {e}")
     finally:
