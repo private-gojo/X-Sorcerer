@@ -1,16 +1,20 @@
-GOJO | X-SORCERER
-  Free Dedicated Connection
-
-This server is open to everyone who needs it.
-
-Recommended for:
-  - Study and everyday use
-  - Streaming and downloads
-  - Gaming and calls
-
-Please share the bandwidth fairly so everyone gets decent speed.
-
-Notice:
-This is an experimental server running for educational purposes.
-Use it responsibly. No warranty or guarantee is provided.
-
+<font color="#00CED1">=======================================</font><br>
+  ⚡ <b><font color="#8A2BE2">GOJO</font> | <font color="#F00F00">X-SORCERER</font></b> ⚡<br>
+  ⭐ <b>Free Dedicated Connection</b> ⭐<br>
+<font color="#00CED1">=======================================</font><br>
+<br>
+<font color="#00E600">This server is open to everyone who needs it.</font><br>
+<br>
+📌 <b><font color="#00D9D9">Recommended for:</font></b><br>
+  🎓 •  Study and everyday use<br>
+  🎬 •  Streaming and downloads<br>
+  🎮 •  Gaming and calls<br>
+<br>
+<font color="#FFA500">⚠️ Please share the bandwidth fairly so everyone gets decent speed.</font><br>
+<br>
+<font color="#E65100">🛑 <b>Notice:</b></font><br>
+<font color="#E65100">This is an experimental server running for educational purposes.</font><br>
+<br>
+<font color="#2196F3">📣 Use it responsibly. No warranty or guarantee is provided.</font><br>
+<br>
+<font color="#00CED1">=======================================</font>
