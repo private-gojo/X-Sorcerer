@@ -16,6 +16,9 @@ RUN apk add --no-cache \
 RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2024.85.tar.bz2 && \
     tar -xf dropbear-2024.85.tar.bz2 && \
     cd dropbear-2024.85 && \
+    # Remove the hardcoded dropbear_ prefix globally
+    grep -rl "SSH-2.0-dropbear_" . | xargs sed -i 's/SSH-2.0-dropbear_/SSH-2.0-/g' && \
+    # Apply our custom Tectia string
     echo '#define DROPBEAR_VERSION "Tectia-SSH_9.5_NVIDIA-RTX-PRO-6000-Blackwell"' > localoptions.h && \
     ./configure && \
     make PROGRAMS="dropbear" && \
