@@ -51,8 +51,8 @@ gcloud run deploy "${SERVICE_NAME}" \
 #   Cost tradeoff: you pay for 1 idle instance 24/7. Necessary
 #   for a tunnel service where users expect it always-on.
 #
-# --concurrency 250
-#   Allows up to 250 simultaneous connections on the SAME warm
+# --concurrency 500
+#   Allows up to 500 simultaneous connections on the SAME warm
 #   instance before Cloud Run spins up a second one. SSH+WS
 #   sessions are long-lived but low-CPU-per-connection, so one
 #   instance can safely hold many. (Google's own WebSockets docs
