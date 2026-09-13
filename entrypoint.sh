@@ -46,4 +46,17 @@ echo "=== [BOOT CHECK] badvpn-udpgw version ==="
 badvpn-udpgw --version
 echo "=========================================="
 
-exec /usr/bin/supervisord -c /etc/supervisord.conf
+# Start supervisord in background so we can trap SIGTERM
+/usr/bin/supervisord -c /etc/supervisord.conf &
+SUPERVISOR_PID=$!
+
+shutdown() {
+    echo "[ENTRYPOINT] Received SIGTERM, shutting down supervisord..."
+    kill -s SIGTERM "$SUPERVISOR_PID"
+    wait "$SUPERVISOR_PID"
+    echo "[ENTRYPOINT] Shutdown complete"
+}
+
+trap shutdown SIGTERM SIGINT
+
+wait "$SUPERVISOR_PID"
