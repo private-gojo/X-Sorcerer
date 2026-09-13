@@ -16,14 +16,23 @@ import asyncio
 import os
 import socket
 import logging
+import signal
+import sys
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [BRIDGE] - %(message)s')
+ 
+def shutdown_handler(signal_num, frame):
+    logging.info("Received SIGTERM, shutting down bridge...")
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, shutdown_handler)
+
 
 LISTEN_PORT = 8081       # internal only — nginx is the public listener now
 SSH_PORT = 2224
 BUF_SIZE = 262144        # bumped from 64KB — I want fewer read/write syscalls during a speedtest burst
 SOCK_BUF = 262144        # explicit kernel socket buffer size, same reasoning
-IDLE_TIMEOUT = 300
+IDLE_TIMEOUT = 25
 HANDSHAKE_TIMEOUT = 3.0
 
 
