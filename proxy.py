@@ -2,19 +2,14 @@
 # ============================================================
 # GOJO SSH+WS RELAY — INTERNAL BRIDGE
 # ============================================================
-# I stripped this down on purpose. Nginx now sits in front and
-# handles the actual WebSocket handshake (upgrade headers,
-# accept key, etc). By the time a connection reaches me here on
-# 127.0.0.1:8081, Nginx has already upgraded it — I just need to
-# bridge raw bytes straight into dropbear. This removes my own
-# hand-rolled handshake parsing from the equation entirely, so
-# I can tell for certain whether that parsing was ever the
-# actual problem.
+# Nginx sits in front of me now using the stream module — it
+# does raw Layer 4 TCP passthrough only, no HTTP or WebSocket
+# parsing at all. So I handle the fake-WS handshake myself here,
+# same as I always did, then relay straight into dropbear.
 #
-# I'm leaving out rate limiting and IP banning for now, like I
-# said — I want the path clean while I confirm the 503 is fixed.
-# I'll bring the anti-DDoS layer back once this is confirmed
-# stable.
+# I'm leaving out rate limiting and IP banning for now — I want
+# the path clean while I confirm this is stable. I'll bring the
+# anti-DDoS layer back once this is confirmed working.
 # ============================================================
 
 import asyncio
@@ -28,6 +23,7 @@ LISTEN_PORT = 8081       # internal only — nginx is the public listener now
 SSH_PORT = 2224
 BUF_SIZE = 65536
 IDLE_TIMEOUT = 300
+HANDSHAKE_TIMEOUT = 3.0
 
 
 def optimize_socket(sock):
@@ -61,6 +57,46 @@ async def handle_client(client_reader, client_writer):
     logging.info(f"New connection from nginx, upstream peer info: {peer}")
 
     try:
+        # I read the fake-WS handshake myself here — nginx's stream
+        # module doesn't touch this, it just passes raw bytes through.
+        raw = b""
+        while b"\r\n\r\n" not in raw:
+            chunk = await asyncio.wait_for(client_reader.read(4096), timeout=HANDSHAKE_TIMEOUT)
+            if not chunk:
+                client_writer.close()
+                return
+            raw += chunk
+            if len(raw) > 16384:
+                client_writer.close()
+                return
+
+        logging.info(f"RAW REQUEST: {raw!r}")
+
+        header_end = raw.index(b"\r\n\r\n") + 4
+        leftover = raw[header_end:]
+
+        if b"upgrade: websocket" in raw.lower():
+            client_writer.write(
+                b"HTTP/1.1 101 Switching Protocols\r\n"
+                b"Upgrade: websocket\r\n"
+                b"Connection: Upgrade\r\n\r\n"
+            )
+            await client_writer.drain()
+        else:
+            logging.info("No websocket upgrade header found, dropping")
+            client_writer.close()
+            return
+
+    except asyncio.TimeoutError:
+        logging.info("Handshake read timed out, dropping")
+        client_writer.close()
+        return
+    except Exception as e:
+        logging.error(f"Handshake error: {e!r}")
+        client_writer.close()
+        return
+
+    try:
         ssh_reader, ssh_writer = await asyncio.open_connection("127.0.0.1", SSH_PORT)
     except Exception as e:
         logging.error(f"Could not reach dropbear on 127.0.0.1:{SSH_PORT}: {e!r}")
@@ -69,6 +105,10 @@ async def handle_client(client_reader, client_writer):
 
     optimize_socket(client_writer.get_extra_info('socket'))
     optimize_socket(ssh_writer.get_extra_info('socket'))
+
+    if leftover:
+        ssh_writer.write(leftover)
+        await ssh_writer.drain()
 
     await asyncio.gather(
         relay(client_reader, ssh_writer, label="client->ssh"),
