@@ -36,7 +36,7 @@ fi
 # Cloud Run always sets this env var — I never hardcode the port
 # anywhere else so this stays portable across environments.
 export PORT="${PORT:-8080}"
-envsubst '${PORT}' < /etc/x-sorcerer/nginx.conf.template | sed "s/__PORT__/${PORT}/" > /etc/nginx/nginx.conf
+sed "s/__PORT__/${PORT}/" /etc/x-sorcerer/nginx.conf.template > /etc/nginx/nginx.conf
 
 echo "=== [BOOT CHECK] badvpn-udpgw version ==="
 badvpn-udpgw --version
