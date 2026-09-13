@@ -29,7 +29,7 @@ COPY --from=builder /usr/local/bin/dropbearkey /usr/local/bin/dropbearkey
 COPY --from=builder /usr/local/bin/badvpn-udpgw /usr/local/bin/badvpn-udpgw
 
 # I added nginx here — this is the new piece.
-RUN apk add --no-cache python3 supervisor bash tzdata zlib nginx gettext
+RUN apk add --no-cache python3 supervisor bash tzdata zlib nginx nginx-mod-stream
 
 RUN mkdir -p /etc/dropbear /var/log/supervisor /etc/x-sorcerer /run/nginx && \
     cp /usr/share/zoneinfo/Asia/Manila /etc/localtime && \
