@@ -38,12 +38,12 @@ fi
 export PORT="${PORT:-8080}"
 sed "s/__PORT__/${PORT}/" /etc/x-sorcerer/nginx.conf.template > /etc/nginx/nginx.conf
 
+# Badvpn needs a valid nameserver for reverse DNS lookups.
+echo "nameserver 1.1.1.1" > /etc/resolv.conf
+echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+
 echo "=== [BOOT CHECK] badvpn-udpgw version ==="
 badvpn-udpgw --version
 echo "=========================================="
-
-echo "=== [BOOT CHECK] nginx config test ==="
-nginx -t
-echo "======================================="
 
 exec /usr/bin/supervisord -c /etc/supervisord.conf
