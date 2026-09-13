@@ -20,3 +20,5 @@ done
 
 echo "ERROR: Bridge did not become ready in time" >&2
 exit 1
+
+
