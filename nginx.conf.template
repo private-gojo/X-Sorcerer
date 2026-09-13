@@ -30,7 +30,7 @@ stream {
     server {
         # Cloud Run injects PORT at runtime; entrypoint.sh substitutes
         # it into this file before nginx starts.
-        listen __PORT__reuseport;
+        listen __PORT__;
 
         # Raw TCP passthrough straight to my bridge. No HTTP parsing
         # or validation happens here — my bridge handles the fake-WS
