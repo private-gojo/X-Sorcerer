@@ -43,6 +43,15 @@ COPY entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh /etc/x-sorcerer/proxy.py
 
+# I added this check so a wrong binary path fails the BUILD
+# immediately, instead of costing me a 4-minute Cloud Run
+# startup-probe timeout every time I get this wrong.
+RUN test -x /usr/sbin/nginx && \
+    test -x /usr/bin/python3 && \
+    test -x /usr/local/sbin/dropbear && \
+    test -x /usr/local/bin/badvpn-udpgw && \
+    echo "All binary paths verified at build time."
+
 EXPOSE 8080
 
 ENTRYPOINT ["/entrypoint.sh"]
