@@ -1,5 +1,5 @@
 # ============================================================
-# GOJO SSH+WS RELAY — NGINX CONFIG
+# GOJO X-SORCERER SSH+WS RELAY — NGINX CONFIG
 # ============================================================
 # I switched this to the stream module. My bridge (proxy.py) is
 # a raw TCP relay into dropbear — it never speaks HTTP back, so
@@ -20,7 +20,7 @@
 load_module /usr/lib/nginx/modules/ngx_stream_module.so;
 
 worker_processes auto;
-worker_rlimit_nofile 65535;
+worker_rlimit_nofile 16384;
 
 events {
     worker_connections 8192;
@@ -43,10 +43,8 @@ stream {
         # side — the default here is much smaller and was likely
         # contributing to the ping spikes I saw under sustained
         # speedtest load.
-        proxy_buffer_size 256k;
-        proxy_socket_keepalive on;
-        proxy_socket_rcvbuf 262144;
-        proxy_socket_sndbuf 262144;
+        proxy_buffer_size 128k;
+        proxy_socket_keepalive on;       
     }
 }
 
