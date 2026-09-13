@@ -1,14 +1,23 @@
 # ============================================================
 # GOJO SSH+WS RELAY — NGINX CONFIG
 # ============================================================
-# I put Nginx in front because I confirmed the 503 was happening
-# before my Python proxy even got the connection — the "RAW
-# REQUEST" debug log never printed, meaning Cloud Run's own edge
-# never handed the request through. Nginx does a proper, spec-
-# compliant WebSocket handshake up front, which is a much safer
-# bet than my own hand-rolled handshake parser for satisfying
-# whatever is checking the request on the way in.
+# I switched this to the stream module. My bridge (proxy.py) is
+# a raw TCP relay into dropbear — it never speaks HTTP back, so
+# the http-module's proxy_pass (which expects an HTTP response
+# from the upstream) was the wrong tool and caused "upstream
+# connect error ... protocol error". The stream module proxies
+# raw bytes at Layer 4, which matches what my bridge actually is.
+#
+# I'm relying on Cloud Run's default TCP startup probe here —
+# it just needs to successfully open a TCP connection to my
+# port, it doesn't require an HTTP 200 response. That's also
+# why I dropped the separate http{} block I had for /healthz:
+# nginx won't let me bind the same port in both an http{} and a
+# stream{} block, and a TCP-level check is all Cloud Run needs
+# by default anyway.
 # ============================================================
+
+load_module /usr/lib/nginx/modules/ngx_stream_module.so;
 
 worker_processes auto;
 worker_rlimit_nofile 4096;
@@ -17,44 +26,18 @@ events {
     worker_connections 2048;
 }
 
-http {
-    # I disabled access logging here to reduce noise — error log
-    # stays on so I can still see real problems in Cloud Run logs.
-    access_log off;
-    error_log /dev/stderr warn;
-
+stream {
     server {
         # Cloud Run injects PORT at runtime; entrypoint.sh substitutes
-        # it into this file before Nginx starts (see entrypoint.sh).
+        # it into this file before nginx starts.
         listen __PORT__;
 
-        # I added this so Cloud Run's startup probe (and my own
-        # manual browser checks) get an instant, reliable 200 OK
-        # without touching the Python bridge or dropbear at all.
-        # This confirms nginx itself is alive and listening,
-        # independent of whether the SSH backend is up yet.
-        location /healthz {
-            access_log off;
-            return 200 "OK\n";
-            add_header Content-Type text/plain;
-        }
-
-        location / {
-            # Standard WebSocket upgrade forwarding — this is the
-            # spec-compliant handshake handling I was missing when
-            # I hand-rolled it in proxy.py.
-            proxy_pass http://127.0.0.1:8081;
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-
-            # I'm keeping these long since SSH sessions are long-lived,
-            # not quick request/response like a normal web page.
-            proxy_read_timeout 3600s;
-            proxy_send_timeout 3600s;
-        }
+        # Raw TCP passthrough straight to my bridge. No HTTP parsing
+        # or validation happens here — my bridge handles the fake-WS
+        # handshake bytes directly now.
+        proxy_pass 127.0.0.1:8081;
+        proxy_timeout 3600s;
+        proxy_connect_timeout 5s;
     }
 }
+
