@@ -21,7 +21,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - [BRIDGE] - %(messa
 
 LISTEN_PORT = 8081       # internal only — nginx is the public listener now
 SSH_PORT = 2224
-BUF_SIZE = 65536
+BUF_SIZE = 262144        # bumped from 64KB — I want fewer read/write syscalls during a speedtest burst
+SOCK_BUF = 262144        # explicit kernel socket buffer size, same reasoning
 IDLE_TIMEOUT = 300
 HANDSHAKE_TIMEOUT = 3.0
 
@@ -32,6 +33,12 @@ def optimize_socket(sock):
     try:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        # I widened these explicitly instead of relying on OS defaults —
+        # the occasional 800ms-1500ms ping spikes I saw during sustained
+        # speedtest load point to the kernel socket buffer filling up
+        # faster than my app-level read/write loop could drain it.
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, SOCK_BUF)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, SOCK_BUF)
     except OSError:
         pass
 
