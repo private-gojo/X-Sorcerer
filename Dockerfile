@@ -29,7 +29,7 @@ COPY --from=builder /usr/local/bin/dropbearkey /usr/local/bin/dropbearkey
 COPY --from=builder /usr/local/bin/badvpn-udpgw /usr/local/bin/badvpn-udpgw
 
 # I added nginx here — this is the new piece.
-RUN apk add --no-cache python3 supervisor bash tzdata zlib nginx nginx-mod-stream
+RUN apk add --no-cache python3 supervisor bash tzdata zlib nginx nginx-mod-stream netcat-openbsd
 
 RUN mkdir -p /etc/dropbear /var/log/supervisor /etc/x-sorcerer /run/nginx && \
     cp /usr/share/zoneinfo/Asia/Manila /etc/localtime && \
@@ -40,6 +40,9 @@ COPY proxy.py /etc/x-sorcerer/proxy.py
 COPY supervisord.conf /etc/supervisord.conf
 COPY nginx.conf.template /etc/x-sorcerer/nginx.conf.template
 COPY entrypoint.sh /entrypoint.sh
+
+COPY wait-for-bridge.sh /etc/x-sorcerer/wait-for-bridge.sh
+RUN chmod +x /etc/x-sorcerer/wait-for-bridge.sh
 
 RUN chmod +x /entrypoint.sh /etc/x-sorcerer/proxy.py
 
@@ -53,5 +56,8 @@ RUN test -x /usr/sbin/nginx && \
     echo "All binary paths verified at build time."
 
 EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD nc -z 127.0.0.1 8081 || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
