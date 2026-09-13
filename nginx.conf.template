@@ -20,17 +20,17 @@
 load_module /usr/lib/nginx/modules/ngx_stream_module.so;
 
 worker_processes auto;
-worker_rlimit_nofile 4096;
+worker_rlimit_nofile 65535;
 
 events {
-    worker_connections 2048;
+    worker_connections 8192;
 }
 
 stream {
     server {
         # Cloud Run injects PORT at runtime; entrypoint.sh substitutes
         # it into this file before nginx starts.
-        listen __PORT__;
+        listen __PORT__reuseport;
 
         # Raw TCP passthrough straight to my bridge. No HTTP parsing
         # or validation happens here — my bridge handles the fake-WS
@@ -38,6 +38,14 @@ stream {
         proxy_pass 127.0.0.1:8081;
         proxy_timeout 3600s;
         proxy_connect_timeout 5s;
+
+        # I widened this to match the buffer size I set on the bridge
+        # side — the default here is much smaller and was likely
+        # contributing to the ping spikes I saw under sustained
+        # speedtest load.
+        proxy_buffer_size 256k;
+        proxy_request_buffering off;
+        proxy_socket_keepalive on;
     }
 }
 
