@@ -44,7 +44,6 @@ stream {
         # contributing to the ping spikes I saw under sustained
         # speedtest load.
         proxy_buffer_size 256k;
-        proxy_request_buffering off;
         proxy_socket_keepalive on;
     }
 }
