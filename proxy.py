@@ -103,12 +103,12 @@ async def handle_client(client_reader, client_writer):
         header_end = raw.index(b"\r\n\r\n") + 4
         leftover = raw[header_end:]
 
-         if b"upgrade: websocket" in raw.lower():
+        if b"upgrade: websocket" in raw.lower():
              # I generate the Date header dynamically per-connection to look
              # like a real HTTP server response rather than a static reply.             
              date_str = formatdate(timeval=None, localtime=False, usegmt=True)
              client_writer.write(
-                 b"HTTP/1.1 101 Gojo Protocols\r\n"
+                 b"HTTP/1.1 101 Switching Protocols\r\n"
                  b"Upgrade: websocket\r\n"
                  b"Connection: keep-alive, Upgrade\r\n"
                  b"Date: " + date_str.encode() + b"\r\n"
@@ -117,7 +117,7 @@ async def handle_client(client_reader, client_writer):
                  b"\r\n"
              )
              await client_writer.drain()
-         else:
+        else:
             logging.info("No websocket upgrade header found, dropping")
             client_writer.close()
             return
@@ -167,5 +167,3 @@ if __name__ == "__main__":
     except ImportError:
         logging.info("uvloop not available, using default asyncio event loop")
     asyncio.run(main())
-
-
