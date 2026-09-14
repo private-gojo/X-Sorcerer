@@ -117,7 +117,7 @@ async def handle_client(client_reader, client_writer):
                  b"\r\n"
              )
              await client_writer.drain()
-          else:
+        else:
             logging.info("No websocket upgrade header found, sending 403 and dropping")
             client_writer.write(
                 b"HTTP/1.1 403 Forbidden\r\n"
