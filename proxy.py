@@ -18,6 +18,7 @@ import socket
 import logging
 import signal
 import sys
+from email.utils import formatdate
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [BRIDGE] - %(message)s')
  
@@ -31,9 +32,8 @@ signal.signal(signal.SIGTERM, shutdown_handler)
 LISTEN_PORT = 8081       # internal only — nginx is the public listener now
 SSH_PORT = 2224
 BUF_SIZE = 262144        # bumped from 64KB — I want fewer read/write syscalls during a speedtest burst
-SOCK_BUF = 262144        # explicit kernel socket buffer size, same reasoning
-IDLE_TIMEOUT = 25
-HANDSHAKE_TIMEOUT = 3.0
+IDLE_TIMEOUT = 600
+HANDSHAKE_TIMEOUT = 4.0
 
 
 def optimize_socket(sock):
@@ -42,12 +42,14 @@ def optimize_socket(sock):
     try:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-        # I widened these explicitly instead of relying on OS defaults —
-        # the occasional 800ms-1500ms ping spikes I saw during sustained
-        # speedtest load point to the kernel socket buffer filling up
-        # faster than my app-level read/write loop could drain it.
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, SOCK_BUF)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, SOCK_BUF)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 15)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
+        # I removed my fixed SO_RCVBUF/SO_SNDBUF here — setting those
+        # explicitly disables the kernel's own TCP autotuning for this
+        # socket, which pins the buffer at a fixed size instead of letting
+        # it grow with actual bandwidth-delay product. Letting the kernel
+        # autotune is the better default for varying network conditions.
     except OSError:
         pass
 
@@ -58,15 +60,25 @@ async def relay(reader, writer, label=""):
             data = await asyncio.wait_for(reader.read(BUF_SIZE), timeout=IDLE_TIMEOUT)
             if not data:
                 break
+            if writer.is_closing():
+                break
             writer.write(data)
-            await writer.drain()
+            await asyncio.wait_for(writer.drain(), timeout=IDLE_TIMEOUT)
     except asyncio.TimeoutError:
-        logging.info(f"Idle timeout on {label}, closing")
-    except Exception:
-        pass
+      logging.info(f"Idle timeout on {label}, closing")
+    except Exception as e:
+      logging.info(f"Relay on {label} ended: {e!r}")
     finally:
-        writer.close()
-
+        # I only close my write side here (half-close) instead of the whole
+        # connection, so the other direction can keep flowing until it's
+        # done naturally. Closing both sides immediately was cutting off
+        # the other leg mid-transfer.
+        try:
+            writer.write_eof()
+        except (OSError, AttributeError):
+            # write_eof() isn't supported on some transport types (e.g. after
+            # the socket is already gone) — fall back to a full close.
+            writer.close()
 
 async def handle_client(client_reader, client_writer):
     peer = client_writer.get_extra_info('peername')
@@ -91,14 +103,21 @@ async def handle_client(client_reader, client_writer):
         header_end = raw.index(b"\r\n\r\n") + 4
         leftover = raw[header_end:]
 
-        if b"upgrade: websocket" in raw.lower():
-            client_writer.write(
-                b"HTTP/1.1 101 Switching Protocols\r\n"
-                b"Upgrade: websocket\r\n"
-                b"Connection: Upgrade\r\n\r\n"
-            )
-            await client_writer.drain()
-        else:
+         if b"upgrade: websocket" in raw.lower():
+             # I generate the Date header dynamically per-connection to look
+             # like a real HTTP server response rather than a static reply.             
+             date_str = formatdate(timeval=None, localtime=False, usegmt=True)
+             client_writer.write(
+                 b"HTTP/1.1 101 Gojo Protocols\r\n"
+                 b"Upgrade: websocket\r\n"
+                 b"Connection: keep-alive, Upgrade\r\n"
+                 b"Date: " + date_str.encode() + b"\r\n"
+                 b"Server: Google Frontend\r\n"
+                 b"X-Powered-By: X-Sorcerer\r\n"
+                 b"\r\n"
+             )
+             await client_writer.drain()
+         else:
             logging.info("No websocket upgrade header found, dropping")
             client_writer.close()
             return
@@ -113,7 +132,7 @@ async def handle_client(client_reader, client_writer):
         return
 
     try:
-        ssh_reader, ssh_writer = await asyncio.open_connection("127.0.0.1", SSH_PORT)
+        ssh_reader, ssh_writer = await asyncio.open_connection("127.0.0.1", SSH_PORT, limit=BUF_SIZE)
     except Exception as e:
         logging.error(f"Could not reach dropbear on 127.0.0.1:{SSH_PORT}: {e!r}")
         client_writer.close()
@@ -134,11 +153,17 @@ async def handle_client(client_reader, client_writer):
 
 
 async def main():
-    server = await asyncio.start_server(handle_client, "127.0.0.1", LISTEN_PORT)
+    server = await asyncio.start_server(handle_client, "127.0.0.1", LISTEN_PORT, limit=BUF_SIZE)
     logging.info(f"Bridge listening on 127.0.0.1:{LISTEN_PORT} -> forwarding to 127.0.0.1:{SSH_PORT}")
     async with server:
         await server.serve_forever()
 
 
 if __name__ == "__main__":
+    try:
+        import uvloop
+        uvloop.install()
+        logging.info("uvloop installed — using faster event loop")
+    except ImportError:
+        logging.info("uvloop not available, using default asyncio event loop")
     asyncio.run(main())
