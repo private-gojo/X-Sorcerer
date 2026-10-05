@@ -12,7 +12,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Fail-fast validation: Titigil agad ang build kung may syntax error ang proxy.py
+      # Fail-fast validation: Stopped immediately the build if have syntax error to proxy.py
       - name: Validate Python Syntax
         run: python3 -m py_compile proxy.py
 
