@@ -15,6 +15,11 @@ if [ -z "${ACCOUNTS:-}" ]; then
     exit 1
 fi
 
+if [[ "$ACCOUNTS" =~ [[:cntrl:]] ]]; then
+    echo "ACCOUNTS contains unsupported control characters" >&2
+    exit 1
+fi
+
 IFS=',' read -ra ADDR <<< "$ACCOUNTS"
 if [ "${#ADDR[@]}" -eq 0 ]; then
     echo "ACCOUNTS contains no accounts" >&2
