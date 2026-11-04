@@ -41,7 +41,11 @@ def expect_rejected(accounts, label):
     result = run_block(accounts)
     if result.returncode == 0:
         raise AssertionError(f"{label}: invalid credentials were accepted")
-    if "refusing to start" not in result.stderr and "invalid username/password" not in result.stderr:
+    if not any(message in result.stderr for message in (
+        "refusing to start",
+        "invalid username/password",
+        "unsupported control characters",
+    )):
         raise AssertionError(f"{label}: unexpected rejection output: {result.stderr!r}")
 
 
