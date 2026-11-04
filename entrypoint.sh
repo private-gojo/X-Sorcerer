@@ -9,20 +9,30 @@ if ! grep -q "/bin/false" /etc/shells; then
     echo "/bin/false" >> /etc/shells
 fi
 
-# I generate accounts from the ACCOUNTS env var, or fall back
-# to my default gojo:gojo if nothing is set.
-if [ -n "$ACCOUNTS" ]; then
-    IFS=',' read -ra ADDR <<< "$ACCOUNTS"
-    for i in "${ADDR[@]}"; do
-        USER=$(echo "$i" | cut -d: -f1)
-        PASS=$(echo "$i" | cut -d: -f2)
-        adduser -D -s /bin/false "$USER"
-        echo "$USER:$PASS" | chpasswd
-    done
-else
-    adduser -D -s /bin/false gojo
-    echo "gojo:gojo" | chpasswd
+# Require explicit credentials; never create a predictable fallback account.
+if [ -z "${ACCOUNTS:-}" ]; then
+    echo "ACCOUNTS is required; refusing to start without explicit credentials" >&2
+    exit 1
 fi
+
+IFS=',' read -ra ADDR <<< "$ACCOUNTS"
+if [ "${#ADDR[@]}" -eq 0 ]; then
+    echo "ACCOUNTS contains no accounts" >&2
+    exit 1
+fi
+
+for i in "${ADDR[@]}"; do
+    USER=${i%%:*}
+    PASS=${i#*:}
+
+    if [[ "$i" != *:* || -z "$USER" || -z "$PASS" || ! "$USER" =~ ^[a-zA-Z0-9_.-]{1,32}$ ]]; then
+        echo "ACCOUNTS contains an invalid username/password entry" >&2
+        exit 1
+    fi
+
+    adduser -D -s /bin/false "$USER" || exit 1
+    printf '%s:%s\n' "$USER" "$PASS" | chpasswd || exit 1
+done
 
 # I generate dropbear host keys if they don't exist yet.
 if [ ! -f /etc/dropbear/dropbear_rsa_host_key ]; then
