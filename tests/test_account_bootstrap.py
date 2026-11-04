@@ -11,11 +11,12 @@ SOURCE = ENTRYPOINT.read_text(encoding="utf-8")
 START = "# Require explicit credentials; never create a predictable fallback account."
 END = "# I generate dropbear host keys if they don't exist yet."
 
-if SOURCE.count(START) != 1 or SOURCE.count(END) != 1:
-    raise SystemExit("Could not locate the account bootstrap block exactly once")
+start_at = SOURCE.find(START)
+end_at = SOURCE.find(END, start_at + len(START)) if start_at >= 0 else -1
+if start_at < 0 or end_at < 0:
+    raise SystemExit("Could not locate the account bootstrap block")
 
-BLOCK = SOURCE.split(START, 1)[1].split(END, 1)[0]
-BLOCK = START + BLOCK
+BLOCK = SOURCE[start_at:end_at]
 
 
 def run_block(accounts, path=None, extra_env=None):
