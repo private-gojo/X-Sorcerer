@@ -6,6 +6,7 @@ on:
       - work/fail-closed-accounts
     paths:
       - entrypoint.sh
+      - Dockerfile
       - tests/test_account_bootstrap.py
       - .github/workflows/security-account-bootstrap.yml
   workflow_dispatch:
@@ -26,3 +27,6 @@ jobs:
 
       - name: Test account bootstrap
         run: python3 tests/test_account_bootstrap.py
+
+      - name: Build image without publishing
+        run: docker build --tag x-sorcerer:ci .
