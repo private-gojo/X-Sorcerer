@@ -1,0 +1,28 @@
+name: SSH Account Bootstrap Security
+
+on:
+  push:
+    branches:
+      - work/fail-closed-accounts
+    paths:
+      - entrypoint.sh
+      - tests/test_account_bootstrap.py
+      - .github/workflows/security-account-bootstrap.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  account-bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate shell syntax
+        run: bash -n entrypoint.sh
+
+      - name: Test account bootstrap
+        run: python3 tests/test_account_bootstrap.py
