@@ -25,7 +25,7 @@ for i in "${ADDR[@]}"; do
     USER=${i%%:*}
     PASS=${i#*:}
 
-    if [[ "$i" != *:* || "$i" == *:*:* || -z "$USER" || -z "$PASS" || ! "$USER" =~ ^[a-zA-Z0-9_.-]{1,32}$ || "$PASS" == *
+    if [[ "$i" != *:* || "$i" == *:*:* || -z "$USER" || -z "$PASS" || ! "$USER" =~ ^[a-zA-Z0-9_.-]{1,32}$ || "$PASS" =~ [[:cntrl:]] ]]; then
         echo "ACCOUNTS contains an invalid username/password entry" >&2
         exit 1
     fi
