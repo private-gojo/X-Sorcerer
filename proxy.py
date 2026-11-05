@@ -2,14 +2,12 @@
 # ============================================================
 # GOJO SSH+WS RELAY — INTERNAL BRIDGE
 # ============================================================
-# Nginx sits in front of me now using the stream module — it
-# does raw Layer 4 TCP passthrough only, no HTTP or WebSocket
-# parsing at all. So I handle the fake-WS handshake myself here,
-# same as I always did, then relay straight into dropbear.
+# Nginx uses the stream module for raw Layer 4 TCP passthrough.
+# HTTP and WebSocket parsing remain in this bridge.
+# The bridge returns the fake-101 response, then relays traffic to Dropbear.
 #
-# I'm leaving out rate limiting and IP banning for now — I want
-# the path clean while I confirm this is stable. I'll bring the
-# anti-DDoS layer back once this is confirmed working.
+# Rate limiting and IP banning are currently disabled.
+# The bridge keeps the transport path minimal during stability validation.
 # ============================================================
 
 import asyncio
@@ -45,11 +43,8 @@ def optimize_socket(sock):
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 15)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
-        # I removed my fixed SO_RCVBUF/SO_SNDBUF here — setting those
-        # explicitly disables the kernel's own TCP autotuning for this
-        # socket, which pins the buffer at a fixed size instead of letting
-        # it grow with actual bandwidth-delay product. Letting the kernel
-        # autotune is the better default for varying network conditions.
+        # Leave receive/send buffer sizing to kernel TCP autotuning.
+        # Fixed values can constrain buffers for varying bandwidth-delay products.
     except OSError:
         pass
 
@@ -69,15 +64,13 @@ async def relay(reader, writer, label=""):
     except Exception as e:
       logging.info(f"Relay on {label} ended: {e!r}")
     finally:
-        # I only close my write side here (half-close) instead of the whole
-        # connection, so the other direction can keep flowing until it's
-        # done naturally. Closing both sides immediately was cutting off
-        # the other leg mid-transfer.
+        # Half-close the destination write side so reverse traffic can continue.
         try:
-            writer.write_eof()
-        except (OSError, AttributeError):
-            # write_eof() isn't supported on some transport types (e.g. after
-            # the socket is already gone) — fall back to a full close.
+            if writer.can_write_eof():
+                writer.write_eof()
+            else:
+                writer.close()
+        except (OSError, RuntimeError, AttributeError, NotImplementedError):
             writer.close()
 
 async def handle_client(client_reader, client_writer):
@@ -85,27 +78,52 @@ async def handle_client(client_reader, client_writer):
     logging.info(f"New connection from nginx, upstream peer info: {peer}")
 
     try:
-        # I read the fake-WS handshake myself here — nginx's stream
-        # module doesn't touch this, it just passes raw bytes through.
+        # Read the fake-WS handshake; Nginx stream passes the bytes unchanged.
         raw = b""
-        while b"\r\n\r\n" not in raw:
-            chunk = await asyncio.wait_for(client_reader.read(4096), timeout=HANDSHAKE_TIMEOUT)
+        loop = asyncio.get_running_loop()
+        handshake_deadline = loop.time() + HANDSHAKE_TIMEOUT
+        header_end = -1
+
+        while header_end < 0:
+            remaining = handshake_deadline - loop.time()
+            if remaining <= 0:
+                raise asyncio.TimeoutError
+
+            chunk = await asyncio.wait_for(
+                client_reader.read(4096),
+                timeout=remaining
+            )
             if not chunk:
                 client_writer.close()
                 return
+
             raw += chunk
-            if len(raw) > 16384:
+            header_end = raw.find(b"\r\n\r\n")
+            if header_end < 0 and len(raw) > 16384:
                 client_writer.close()
                 return
 
-        logging.info(f"RAW REQUEST: {raw!r}")
+        header_end += 4
+        if header_end > 16384:
+            client_writer.close()
+            return
 
-        header_end = raw.index(b"\r\n\r\n") + 4
+        header_lines = raw[:header_end - 4].split(b"\r\n")[1:]
+        websocket_upgrade = any(
+            name.strip().lower() == b"upgrade"
+            and separator
+            and any(
+                token.strip().lower() == b"websocket"
+                for token in value.split(b",")
+            )
+            for name, separator, value in (
+                line.partition(b":") for line in header_lines
+            )
+        )
         leftover = raw[header_end:]
 
-        if b"upgrade: websocket" in raw.lower():
-             # I generate the Date header dynamically per-connection to look
-             # like a real HTTP server response rather than a static reply.             
+        if websocket_upgrade:
+             # Generate a Date header dynamically for each fake-101 response.
              date_str = formatdate(timeval=None, localtime=False, usegmt=True)
              client_writer.write(
                  b"HTTP/1.1 101 Switching Protocols\r\n"
@@ -146,18 +164,27 @@ async def handle_client(client_reader, client_writer):
         client_writer.close()
         return
 
-    optimize_socket(client_writer.get_extra_info('socket'))
-    optimize_socket(ssh_writer.get_extra_info('socket'))
+    try:
+        optimize_socket(client_writer.get_extra_info('socket'))
+        optimize_socket(ssh_writer.get_extra_info('socket'))
 
-    if leftover:
-        ssh_writer.write(leftover)
-        await ssh_writer.drain()
+        if leftover:
+            ssh_writer.write(leftover)
+            await ssh_writer.drain()
 
-    await asyncio.gather(
-        relay(client_reader, ssh_writer, label="client->ssh"),
-        relay(ssh_reader, client_writer, label="ssh->client"),
-        return_exceptions=True
-    )
+        await asyncio.gather(
+            relay(client_reader, ssh_writer, label="client->ssh"),
+            relay(ssh_reader, client_writer, label="ssh->client"),
+            return_exceptions=True
+        )
+    finally:
+        client_writer.close()
+        ssh_writer.close()
+        await asyncio.gather(
+            client_writer.wait_closed(),
+            ssh_writer.wait_closed(),
+            return_exceptions=True
+        )
 
 
 async def main():
@@ -170,8 +197,12 @@ async def main():
 if __name__ == "__main__":
     try:
         import uvloop
-        uvloop.install()
-        logging.info("uvloop installed — using faster event loop")
     except ImportError:
-        logging.info("uvloop not available, using default asyncio event loop")
-    asyncio.run(main())
+        uvloop = None
+
+    if uvloop is not None:
+        logging.info("uvloop available — using uvloop event loop")
+        uvloop.run(main())
+    else:
+        logging.info("uvloop unavailable — using default asyncio event loop")
+        asyncio.run(main())
