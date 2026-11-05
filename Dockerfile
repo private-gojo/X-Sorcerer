@@ -10,7 +10,8 @@ RUN apk add --no-cache build-base wget zlib-dev linux-headers cmake git openssl-
 RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2 && \
     tar -xf dropbear-2026.94.tar.bz2 && \
     cd dropbear-2026.94 && \
-    grep -rl "SSH-2.0-dropbear_" . | xargs sed -i 's/SSH-2.0-dropbear_/SSH-2.0-/g' && \
+    grep -Fq '#define LOCAL_IDENT "SSH-2.0-dropbear" IDENT_VERSION_PART' src/sysoptions.h && \
+    sed -i 's|#define LOCAL_IDENT "SSH-2.0-dropbear" IDENT_VERSION_PART|#define LOCAL_IDENT "SSH-2.0-" DROPBEAR_VERSION|' src/sysoptions.h && \
     echo '#define DROPBEAR_VERSION "OpenSSH_10.6p2 Ubuntu-2ubuntu3.6"' > localoptions.h && \
     ./configure && \
     make PROGRAMS="dropbear dropbearkey" && \
