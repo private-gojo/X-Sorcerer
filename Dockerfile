@@ -1,7 +1,7 @@
 # ============================================================
 # GOJO SSH+WS RELAY — DOCKERFILE (v2, nginx-fronted)
 # ============================================================
-FROM alpine:3.24.4 AS builder
+FROM alpine:3.24.3 AS builder
 
 RUN apk add --no-cache \
     build-base=0.5-r4 \
@@ -58,7 +58,7 @@ RUN git clone --depth 1 https://github.com/ambrop72/badvpn.git /tmp/badvpn && \
     cmake .. -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1 && \
     make install
 
-FROM alpine:3.24.4
+FROM alpine:3.24.3
 
 COPY --from=builder /usr/local/sbin/dropbear /usr/local/sbin/dropbear
 COPY --from=builder /usr/local/bin/dropbearkey /usr/local/bin/dropbearkey
