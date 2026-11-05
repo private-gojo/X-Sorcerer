@@ -1,9 +1,16 @@
 # ============================================================
 # GOJO SSH+WS RELAY — DOCKERFILE (v2, nginx-fronted)
 # ============================================================
-FROM alpine:latest AS builder
+FROM alpine:3.24.4 AS builder
 
-RUN apk add --no-cache build-base wget zlib-dev linux-headers cmake git openssl-dev
+RUN apk add --no-cache \
+    build-base=0.5-r4 \
+    wget=1.25.0-r3 \
+    zlib-dev=1.3.2-r1 \
+    linux-headers=7.0.0-r1 \
+    cmake=4.2.3-r0 \
+    git=2.54.0-r0 \
+    openssl-dev=3.5.9-r0
 
 # I kept my dropbear build exactly as it was — this part was
 # never broken, so I'm not touching it.
@@ -12,7 +19,7 @@ RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2 && \
     cd dropbear-2026.94 && \
     grep -Fq '#define LOCAL_IDENT "SSH-2.0-dropbear" IDENT_VERSION_PART' src/sysoptions.h && \
     sed -i 's|#define LOCAL_IDENT "SSH-2.0-dropbear" IDENT_VERSION_PART|#define LOCAL_IDENT "SSH-2.0-" DROPBEAR_VERSION|' src/sysoptions.h && \
-    printf '%s\n' \
+    printf '%s\\n' \
       '#define DROPBEAR_VERSION "OpenSSH_10.6p2 Ubuntu-2ubuntu3.6"' \
       '#define DROPBEAR_SMALL_CODE 0' \
       '#define DROPBEAR_USER_ALGO_LIST 1' \
@@ -45,20 +52,30 @@ RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2 && \
     make PROGRAMS="dropbear dropbearkey" install
 
 RUN git clone --depth 1 https://github.com/ambrop72/badvpn.git /tmp/badvpn && \
+    git -C /tmp/badvpn checkout --detach 07268f02706e78e282e19641b5d1d41e8e89bf31 && \
     mkdir -p /tmp/badvpn/build && \
     cd /tmp/badvpn/build && \
     cmake .. -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1 && \
     make install
 
-FROM alpine:latest
+FROM alpine:3.24.4
 
 COPY --from=builder /usr/local/sbin/dropbear /usr/local/sbin/dropbear
 COPY --from=builder /usr/local/bin/dropbearkey /usr/local/bin/dropbearkey
 COPY --from=builder /usr/local/bin/badvpn-udpgw /usr/local/bin/badvpn-udpgw
 
 # I added nginx here — this is the new piece.
-RUN apk add --no-cache python3 py3-pip supervisor bash tzdata zlib nginx nginx-mod-stream netcat-openbsd
-RUN pip3 install uvloop --break-system-packages || echo "[!] uvloop wheel not found for this Python/musl version. Proxy will fallback to standard asyncio."
+RUN apk add --no-cache \
+    python3=3.14.10-r1 \
+    py3-pip=26.1.2-r0 \
+    supervisor=4.3.0-r1 \
+    bash=5.3.9-r1 \
+    tzdata=2026f-r0 \
+    zlib=1.3.2-r1 \
+    nginx=1.30.6-r0 \
+    nginx-mod-stream=1.30.6-r0 \
+    netcat-openbsd=1.234.1-r0
+RUN python3 -m pip install --no-cache-dir --break-system-packages "uvloop==0.23.0"
 
 RUN mkdir -p /etc/dropbear /var/log/supervisor /etc/x-sorcerer /run/nginx && \
     cp /usr/share/zoneinfo/Asia/Manila /etc/localtime && \
