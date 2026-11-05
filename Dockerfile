@@ -12,7 +12,34 @@ RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2 && \
     cd dropbear-2026.94 && \
     grep -Fq '#define LOCAL_IDENT "SSH-2.0-dropbear" IDENT_VERSION_PART' src/sysoptions.h && \
     sed -i 's|#define LOCAL_IDENT "SSH-2.0-dropbear" IDENT_VERSION_PART|#define LOCAL_IDENT "SSH-2.0-" DROPBEAR_VERSION|' src/sysoptions.h && \
-    echo '#define DROPBEAR_VERSION "OpenSSH_10.6p2 Ubuntu-2ubuntu3.6"' > localoptions.h && \
+    printf '%s\\n' \\
+      '#define DROPBEAR_VERSION "OpenSSH_10.6p2 Ubuntu-2ubuntu3.6"' \\
+      '#define DROPBEAR_SMALL_CODE 0' \\
+      '#define DROPBEAR_USER_ALGO_LIST 1' \\
+      '#define DROPBEAR_AES128 1' \\
+      '#define DROPBEAR_AES256 1' \\
+      '#define DROPBEAR_3DES 0' \\
+      '#define DROPBEAR_CHACHA20POLY1305 1' \\
+      '#define DROPBEAR_ENABLE_CTR_MODE 1' \\
+      '#define DROPBEAR_ENABLE_GCM_MODE 1' \\
+      '#define DROPBEAR_ENABLE_CBC_MODE 0' \\
+      '#define DROPBEAR_SHA1_HMAC 0' \\
+      '#define DROPBEAR_SHA2_256_HMAC 1' \\
+      '#define DROPBEAR_SHA2_512_HMAC 0' \\
+      '#define DROPBEAR_SHA1_96_HMAC 0' \\
+      '#define DROPBEAR_RSA 1' \\
+      '#define DROPBEAR_RSA_SHA1 0' \\
+      '#define DROPBEAR_DSS 0' \\
+      '#define DROPBEAR_ECDSA 1' \\
+      '#define DROPBEAR_ED25519 1' \\
+      '#define DROPBEAR_DH_GROUP14_SHA1 0' \\
+      '#define DROPBEAR_DH_GROUP14_SHA256 1' \\
+      '#define DROPBEAR_DH_GROUP16 0' \\
+      '#define DROPBEAR_CURVE25519 1' \\
+      '#define DROPBEAR_SNTRUP761 1' \\
+      '#define DROPBEAR_MLKEM768 1' \\
+      '#define DROPBEAR_ECDH 1' \\
+      '#define DROPBEAR_DH_GROUP1 0' > localoptions.h && \\
     ./configure && \
     make PROGRAMS="dropbear dropbearkey" && \
     make PROGRAMS="dropbear dropbearkey" install
