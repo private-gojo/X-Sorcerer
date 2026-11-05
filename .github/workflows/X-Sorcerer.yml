@@ -7,12 +7,14 @@ on:
 
 jobs:
   build-and-push:
+    # Update: Pin the runner to a fixed Ubuntu release.
     runs-on: ubuntu-26.04
     steps:
+      # Update: Pin GitHub Actions to immutable commit SHAs.
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Fail-fast validation: Stopped immediately the build if have syntax error to proxy.py
+      # Validation: Fail the workflow when proxy.py contains Python syntax errors.
       - name: Validate Python Syntax
         run: python3 -m py_compile proxy.py
 
@@ -22,6 +24,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # Update: Pin the Buildx binary and BuildKit container versions.
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
