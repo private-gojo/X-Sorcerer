@@ -7,9 +7,9 @@ RUN apk add --no-cache build-base wget zlib-dev linux-headers cmake git openssl-
 
 # I kept my dropbear build exactly as it was — this part was
 # never broken, so I'm not touching it.
-RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2024.85.tar.bz2 && \
-    tar -xf dropbear-2024.85.tar.bz2 && \
-    cd dropbear-2024.85 && \
+RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2 && \
+    tar -xf dropbear-2026.94.tar.bz2 && \
+    cd dropbear-2026.94 && \
     grep -rl "SSH-2.0-dropbear_" . | xargs sed -i 's/SSH-2.0-dropbear_/SSH-2.0-/g' && \
     echo '#define DROPBEAR_VERSION "OpenSSH_10.2p1 Ubuntu-2ubuntu3.6"' > localoptions.h && \
     ./configure && \
@@ -62,4 +62,3 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD nc -z 127.0.0.1 8081 || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
-
