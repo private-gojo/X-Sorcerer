@@ -11,7 +11,7 @@ RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2 && \
     tar -xf dropbear-2026.94.tar.bz2 && \
     cd dropbear-2026.94 && \
     grep -rl "SSH-2.0-dropbear_" . | xargs sed -i 's/SSH-2.0-dropbear_/SSH-2.0-/g' && \
-    echo '#define DROPBEAR_VERSION "OpenSSH_10.2p1 Ubuntu-2ubuntu3.6"' > localoptions.h && \
+    echo '#define DROPBEAR_VERSION "OpenSSH_10.6p2 Ubuntu-2ubuntu3.6"' > localoptions.h && \
     ./configure && \
     make PROGRAMS="dropbear dropbearkey" && \
     make PROGRAMS="dropbear dropbearkey" install
