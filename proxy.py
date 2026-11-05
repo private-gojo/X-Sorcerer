@@ -29,7 +29,7 @@ signal.signal(signal.SIGTERM, shutdown_handler)
 
 LISTEN_PORT = 8081       # internal only — nginx is the public listener now
 SSH_PORT = 2224
-BUF_SIZE = 262144        # bumped from 64KB — I want fewer read/write syscalls during a speedtest burst
+BUF_SIZE = 262144        # 256 KiB chunks reduce per-transfer read/write overhead.
 IDLE_TIMEOUT = 600
 HANDSHAKE_TIMEOUT = 4.0
 
