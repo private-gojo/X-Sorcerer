@@ -61,25 +61,54 @@ def _read_proc_metrics():
     return rss_kb, open_fds
 
 
-def _read_cgroup_cpu_metrics():
+def _read_cgroup_metrics():
     quota = "n/a"
+    cpu_usage_usec = None
     throttled = None
+    memory_current = "n/a"
+    memory_max = "n/a"
     try:
         with open("/sys/fs/cgroup/cpu.max", "r", encoding="ascii") as cpu_file:
             quota = cpu_file.read().strip()
     except OSError:
         pass
+
     for path in ("/sys/fs/cgroup/cpu.stat", "/sys/fs/cgroup/cpu/cpu.stat"):
         try:
             with open(path, "r", encoding="ascii") as cpu_file:
                 values = dict(line.split() for line in cpu_file if len(line.split()) == 2)
-            value = values.get("throttled_usec", values.get("throttled_time"))
-            if value is not None:
-                throttled = int(value)
+            if "usage_usec" in values:
+                cpu_usage_usec = int(values["usage_usec"])
+            if "throttled_usec" in values:
+                throttled = int(values["throttled_usec"])
+            elif "throttled_time" in values:
+                throttled = int(values["throttled_time"])
             break
         except (OSError, ValueError):
             continue
-    return quota, throttled
+
+    if cpu_usage_usec is None:
+        try:
+            with open("/sys/fs/cgroup/cpuacct/cpuacct.usage", "r", encoding="ascii") as usage_file:
+                cpu_usage_usec = int(usage_file.read().strip()) // 1000
+        except (OSError, ValueError):
+            pass
+
+    try:
+        with open("/sys/fs/cgroup/memory.current", "r", encoding="ascii") as memory_file:
+            memory_current = memory_file.read().strip()
+        with open("/sys/fs/cgroup/memory.max", "r", encoding="ascii") as memory_file:
+            memory_max = memory_file.read().strip()
+    except OSError:
+        try:
+            with open("/sys/fs/cgroup/memory/memory.usage_in_bytes", "r", encoding="ascii") as memory_file:
+                memory_current = memory_file.read().strip()
+            with open("/sys/fs/cgroup/memory/memory.limit_in_bytes", "r", encoding="ascii") as memory_file:
+                memory_max = memory_file.read().strip()
+        except OSError:
+            pass
+
+    return quota, cpu_usage_usec, throttled, memory_current, memory_max
 
 
 async def metrics_loop():
@@ -89,7 +118,7 @@ async def metrics_loop():
     previous_wall = time.monotonic()
     usage = resource.getrusage(resource.RUSAGE_SELF)
     previous_cpu = usage.ru_utime + usage.ru_stime
-    _, previous_throttled = _read_cgroup_cpu_metrics()
+    _, previous_cgroup_cpu, previous_throttled, _, _ = _read_cgroup_metrics()
 
     while True:
         await asyncio.sleep(max(0.0, next_tick - loop.time()))
@@ -100,7 +129,10 @@ async def metrics_loop():
         current_cpu = usage.ru_utime + usage.ru_stime
         elapsed = max(now_wall - previous_wall, 0.001)
         cpu_cores = max(0.0, current_cpu - previous_cpu) / elapsed
-        cpu_quota, current_throttled = _read_cgroup_cpu_metrics()
+        cpu_quota, current_cgroup_cpu, current_throttled, memory_current, memory_max = _read_cgroup_metrics()
+        container_cpu_cores = "n/a"
+        if current_cgroup_cpu is not None and previous_cgroup_cpu is not None:
+            container_cpu_cores = f"{max(0, current_cgroup_cpu - previous_cgroup_cpu) / 1000000.0 / elapsed:.3f}"
         throttled_delta = "n/a"
         if current_throttled is not None and previous_throttled is not None:
             throttled_delta = str(max(0, current_throttled - previous_throttled))
@@ -109,16 +141,19 @@ async def metrics_loop():
         logging.info(
             "[METRICS] active_sessions=%d total_sessions=%d "
             "client_to_ssh_bytes=%d ssh_to_client_bytes=%d "
-            "process_cpu_cores=%.3f cpu_quota=%s cpu_throttled_delta=%s "
-            "rss_kb=%s open_fds=%s event_loop_lag_ms=%.2f",
+            "process_cpu_cores=%.3f container_cpu_cores=%s cpu_quota=%s "
+            "cpu_throttled_delta=%s rss_kb=%s open_fds=%s "
+            "cgroup_memory_current=%s cgroup_memory_max=%s event_loop_lag_ms=%.2f",
             ACTIVE_SESSIONS, TOTAL_SESSIONS,
             TOTAL_CLIENT_TO_SSH, TOTAL_SSH_TO_CLIENT,
-            cpu_cores, cpu_quota, throttled_delta,
-            rss_kb, open_fds, lag_ms
+            cpu_cores, container_cpu_cores, cpu_quota,
+            throttled_delta, rss_kb, open_fds,
+            memory_current, memory_max, lag_ms
         )
 
         previous_wall = now_wall
         previous_cpu = current_cpu
+        previous_cgroup_cpu = current_cgroup_cpu
         previous_throttled = current_throttled
         next_tick += interval
         if next_tick <= now_loop:

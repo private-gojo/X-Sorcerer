@@ -271,9 +271,7 @@ impl<R: AsyncRead + Unpin> FrameReader<R> {
     /// what badvpn does, which only drops the client on decoder (framing) errors.
     pub async fn next_msg(&mut self) -> io::Result<Option<Vec<u8>>> {
         let mut lenb = [0u8; 2];
-        // read_exact on the prefix tells a clean EOF (client closed between messages → None) from
-        // an EOF halfway through (truncated message → error, in the read_exact of the body below).
-        // Only EOF before the first prefix byte is clean; a partial prefix is a framing error.
+        // Only EOF before the first prefix byte is clean; a partial prefix or body is a framing error.
         if self.rd.read(&mut lenb[..1]).await? == 0 {
             return Ok(None);
         }
