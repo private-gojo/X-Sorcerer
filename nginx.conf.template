@@ -21,12 +21,20 @@ load_module /usr/lib/nginx/modules/ngx_stream_module.so;
 
 worker_processes auto;
 worker_rlimit_nofile 16384;
+error_log /dev/stderr info;
 
 events {
     worker_connections 8192;
 }
 
 stream {
+    log_format stream_diag '$time_iso8601 connection=$connection remote=$remote_addr:$remote_port '
+                           'status=$status session_time=$session_time '
+                           'upstream_connect_time=$upstream_connect_time '
+                           'bytes_sent=$bytes_sent bytes_received=$bytes_received '
+                           'upstream=$upstream_addr';
+    access_log /dev/stdout stream_diag;
+
     server {
         # Cloud Run injects PORT at runtime; entrypoint.sh substitutes
         # it into this file before nginx starts.

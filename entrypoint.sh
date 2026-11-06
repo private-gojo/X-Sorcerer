@@ -38,11 +38,28 @@ fi
 export PORT="${PORT:-8080}"
 sed "s/__PORT__/${PORT}/" /etc/x-sorcerer/nginx.conf.template > /etc/nginx/nginx.conf
 
-# Badvpn needs a valid nameserver for reverse DNS lookups.
-echo "nameserver 1.1.1.1" > /etc/resolv.conf
-echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+echo "=== [STARTUP DIAGNOSTICS] ==="
+echo "[DIAG] resolver configuration:"
+if [ -r /etc/resolv.conf ]; then
+    cat /etc/resolv.conf
+else
+    echo "[DIAG] /etc/resolv.conf is unavailable"
+fi
+echo "[DIAG] configured nameservers:"
+grep -E '^[[:space:]]*nameserver[[:space:]]+' /etc/resolv.conf 2>/dev/null || true
+echo "[DIAG] online CPU entries: $(grep -c '^processor' /proc/cpuinfo 2>/dev/null || echo unknown)"
+echo "[DIAG] file descriptor limit: $(ulimit -n)"
+echo "[DIAG] cgroup cpu.max:"
+cat /sys/fs/cgroup/cpu.max 2>/dev/null || true
+echo "[DIAG] cgroup cpu.stat:"
+cat /sys/fs/cgroup/cpu.stat 2>/dev/null || cat /sys/fs/cgroup/cpu/cpu.stat 2>/dev/null || true
+echo "[DIAG] cgroup memory.current / memory.max:"
+cat /sys/fs/cgroup/memory.current /sys/fs/cgroup/memory.max 2>/dev/null || true
+echo "[DIAG] process status:"
+grep -E '^(VmRSS|Threads):' /proc/self/status 2>/dev/null || true
+echo "=== [STARTUP DIAGNOSTICS END] ==="
 
-echo "=== [BOOT CHECK] badvpn-udpgw version ==="
+echo "=== [BOOT CHECK] Rust UDPGW version ==="
 badvpn-udpgw --version
 echo "=========================================="
 
