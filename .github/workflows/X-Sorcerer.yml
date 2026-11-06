@@ -3,6 +3,8 @@ name: Build and Publish X-Limit
 on:
   push:
     branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -17,6 +19,7 @@ jobs:
         run: python3 -m py_compile proxy.py
 
       - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -29,7 +32,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/x-limit:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/x-limit:${{ github.sha }}

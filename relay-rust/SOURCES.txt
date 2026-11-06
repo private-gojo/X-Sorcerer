@@ -1,0 +1,5 @@
+Upstream: https://github.com/Dean6767/RustBadVpnUdpgw
+Commit: bfd488a62618fc9dd026ac221b2f274a90ffe2b8
+License: MIT
+
+The imported source files were byte-for-byte compared with this pinned upstream revision before local diagnostics and framing fixes were applied.

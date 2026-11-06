@@ -1,7 +1,12 @@
 # ============================================================
-# GOJO SSH+WS RELAY — DOCKERFILE (v2, nginx-fronted)
+# X-SORCERER SSH+WS RELAY — DOCKERFILE
 # ============================================================
-# Update: Pin the build image to a fixed Alpine 3.24 patch release.
+FROM rust:1.96-alpine3.24@sha256:a41f7740f8b45d45795624eec13a8b42263cc700f19f7e4e86e04d3dda08a479 AS udpgw-builder
+
+WORKDIR /build
+COPY relay-rust/ ./
+RUN cargo test --locked && cargo build --locked --release
+
 FROM alpine:3.24.3 AS builder
 
 # Update: Pin build tools and development libraries to exact APK revisions.
@@ -10,8 +15,6 @@ RUN apk add --no-cache \
     wget=1.25.0-r3 \
     zlib-dev=1.3.2-r1 \
     linux-headers=7.0.0-r1 \
-    cmake=4.2.3-r0 \
-    git=2.54.0-r0 \
     openssl-dev=3.5.9-r0
 
 # Dropbear: SSH server build and configured crypto feature set.
@@ -52,20 +55,12 @@ RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2 && \
     make PROGRAMS="dropbear dropbearkey" && \
     make PROGRAMS="dropbear dropbearkey" install
 
-# Update: Pin BadVPN to a fixed upstream commit for reproducible builds.
-RUN git clone --depth 1 https://github.com/ambrop72/badvpn.git /tmp/badvpn && \
-    git -C /tmp/badvpn checkout --detach 07268f02706e78e282e19641b5d1d41e8e89bf31 && \
-    mkdir -p /tmp/badvpn/build && \
-    cd /tmp/badvpn/build && \
-    cmake .. -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1 && \
-    make install
-
 # Update: Use the same pinned Alpine release for the runtime image.
 FROM alpine:3.24.3
 
 COPY --from=builder /usr/local/sbin/dropbear /usr/local/sbin/dropbear
 COPY --from=builder /usr/local/bin/dropbearkey /usr/local/bin/dropbearkey
-COPY --from=builder /usr/local/bin/badvpn-udpgw /usr/local/bin/badvpn-udpgw
+COPY --from=udpgw-builder /build/target/release/badvpn-udpgw /usr/local/bin/badvpn-udpgw
 
 # Added: Nginx front end and required runtime services.
 # Update: Pin runtime packages to exact APK revisions.
@@ -107,6 +102,6 @@ RUN test -x /usr/sbin/nginx && \
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD nc -z 127.0.0.1 8081 || exit 1
+  CMD nc -z 127.0.0.1 8081 && nc -z 127.0.0.1 7300 || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
