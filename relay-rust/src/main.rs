@@ -180,7 +180,7 @@ async fn main() {
 
     let stats_shared = shared.clone();
     let stats_task = tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(time::Duration::from_secs(10));
+        let mut ticker = tokio::time::interval(Duration::from_secs(10));
         ticker.tick().await;
         loop {
             ticker.tick().await;
