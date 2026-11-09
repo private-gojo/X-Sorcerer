@@ -8,7 +8,7 @@
 # console logs. That pattern (reason: MANUAL_OR_CUSTOMER_INITIATED,
 # cycling every ~3 seconds) matches Cloud Run's own scale-to-zero
 # behavior: with min-instances=0, EVERY new connection (including
-; Google's own health-check probes) can trigger a fresh cold-start
+# Google's own health-check probes) can trigger a fresh cold-start
 # instance, which then gets torn down again right after. This is
 # confirmed in Google's own Cloud Run WebSockets documentation:
 # WebSocket/long-lived connections should raise concurrency and
