@@ -1,20 +1,32 @@
-<font color="#00CED1">=======================================</font><br>
-  ⚡ <b><font color="#8A2BE2">GOJO</font> | <font color="#F00F00">X-SORCERER</font></b> ⚡<br>
-  ⭐ <b>Free Dedicated Connection</b> ⭐<br>
-<font color="#00CED1">=======================================</font><br>
+<font color="#800080">==============================</font><br>
+⚡ <b><font color="#8A2BE2">GOJO</font> | <font color="#D32F2F">RELAY-X</font></b> ⚡<br>
+<font color="#800080">==============================</font><br>
 <br>
-<font color="#00E600">This server is open to everyone who needs it.</font><br>
+<font color="#D97706">⭐ <b>Service Note:</b></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<font color="#059669">• <b>Free Shared Connection</b></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<font color="#2E8B57">• This server is open to everyone who needs it.</font><br>
+<font color="#808080">------------------------------</font><br>
 <br>
-📌 <b><font color="#00D9D9">Recommended for:</font></b><br>
-  🎓 •  Study and everyday use<br>
-  🎬 •  Streaming and downloads<br>
-  🎮 •  Gaming and calls<br>
+📌 <b><font color="#0073E6">Recommended for:</font></b><br>
+&nbsp;&nbsp;&nbsp;&nbsp;🎓 <font color="#005BB5">• Study and everyday use</font><br>
+&nbsp;&nbsp;&nbsp;&nbsp;🎬 <font color="#C71585">• Streaming and downloads</font><br>
+&nbsp;&nbsp;&nbsp;&nbsp;🎮 <font color="#E65100">• Gaming and calls</font><br>
+<font color="#808080">------------------------------</font><br>
 <br>
-<font color="#FFA500">⚠️ Please share the bandwidth fairly so everyone gets decent speed.</font><br>
+<font color="#D32F2F">🛑 <b>Notice:</b></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<font color="#B22222">• Experimental server, provided for community purposes only.</font><br>
+<font color="#808080">------------------------------</font><br>
 <br>
-<font color="#E65100">🛑 <b>Notice:</b></font><br>
-<font color="#E65100">This is an experimental server running for educational purposes.</font><br>
+<font color="#F57C00">⚠️ <b>Fair Use:</b></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<font color="#CD853F">• Speed and availability depend on network conditions and server load.</font><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<font color="#CD853F">• Resources are shared. Use fairly so everyone gets decent speed.</font><br>
+<font color="#808080">------------------------------</font><br>
 <br>
-<font color="#2196F3">📣 Use it responsibly. No warranty or guarantee is provided.</font><br>
+<font color="#B8860B">📝 <b>Disclaimer:</b></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<font color="#059669">• Provided "as is" on a best-effort basis.</font><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<font color="#B22222">• Service may be interrupted or restricted without prior notice.</font><br>
+<font color="#808080">------------------------------</font><br>
 <br>
-<font color="#00CED1">=======================================</font>
+<font color="#0073E6">📣 <b>Use it responsibly.</b> No warranty or guarantee is provided.</font><br>
+<br>
+<font color="#800080">==============================</font>
