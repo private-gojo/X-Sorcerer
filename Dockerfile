@@ -7,13 +7,13 @@ WORKDIR /build
 COPY relay-rust/ ./
 RUN cargo test --locked && cargo build --locked --release
 
-FROM alpine:3.24.3 AS builder
+FROM alpine:3.24.4 AS builder
 
 # Update: Pin build tools and development libraries to exact APK revisions.
 RUN apk add --no-cache \
     build-base=0.5-r4 \
     wget=1.25.0-r3 \
-    zlib-dev=1.3.2-r1 \
+    zlib-dev=1.4-r0 \
     linux-headers=7.0.0-r1 \
     openssl-dev=3.5.9-r0
 
@@ -23,7 +23,7 @@ RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2 && \
     cd dropbear-2026.94 && \
     grep -Fq '#define LOCAL_IDENT "SSH-2.0-dropbear" IDENT_VERSION_PART' src/sysoptions.h && \
     sed -i 's|#define LOCAL_IDENT "SSH-2.0-dropbear" IDENT_VERSION_PART|#define LOCAL_IDENT "SSH-2.0-" DROPBEAR_VERSION|' src/sysoptions.h && \
-    printf '%s\n' \
+    printf '%s\\n' \
       '#define DROPBEAR_VERSION "OpenSSH_10.6p2 Ubuntu-2ubuntu3.6"' \
       '#define DROPBEAR_SMALL_CODE 0' \
       '#define DROPBEAR_USER_ALGO_LIST 1' \
@@ -56,7 +56,7 @@ RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2 && \
     make PROGRAMS="dropbear dropbearkey" install
 
 # Update: Use the same pinned Alpine release for the runtime image.
-FROM alpine:3.24.3
+FROM alpine:3.24.4
 
 COPY --from=builder /usr/local/sbin/dropbear /usr/local/sbin/dropbear
 COPY --from=builder /usr/local/bin/dropbearkey /usr/local/bin/dropbearkey
@@ -70,7 +70,7 @@ RUN apk add --no-cache \
     supervisor=4.3.0-r1 \
     bash=5.3.9-r1 \
     tzdata=2026f-r0 \
-    zlib=1.3.2-r1 \
+    zlib=1.4-r0 \
     nginx=1.30.6-r0 \
     nginx-mod-stream=1.30.6-r0 \
     netcat-openbsd=1.234.1-r0
