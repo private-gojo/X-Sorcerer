@@ -52,7 +52,10 @@ RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2 && \
       '#define DROPBEAR_SNTRUP761 1' \
       '#define DROPBEAR_MLKEM768 1' \
       '#define DROPBEAR_ECDH 1' \
-      '#define DROPBEAR_DH_GROUP1 0' > localoptions.h && \
+      '#define DROPBEAR_DH_GROUP1 0' \\
+      '#define MAX_UNAUTH_PER_IP 512' \\
+      '#define MAX_UNAUTH_CLIENTS 512' \\
+      '#define AUTH_TIMEOUT 60' > localoptions.h && \
     ./configure && \
     make PROGRAMS="dropbear dropbearkey" && \
     make PROGRAMS="dropbear dropbearkey" install
@@ -68,7 +71,6 @@ COPY --from=udpgw-builder /build/target/release/badvpn-udpgw /usr/local/bin/badv
 # Update: Pin runtime packages to exact APK revisions.
 RUN apk add --no-cache \
     python3=3.14.10-r1 \
-    py3-pip=26.1.2-r0 \
     supervisor=4.3.0-r1 \
     bash=5.3.9-r1 \
     tzdata=2026f-r0 \
@@ -76,8 +78,11 @@ RUN apk add --no-cache \
     nginx=1.30.6-r0 \
     nginx-mod-stream=1.30.6-r0 \
     netcat-openbsd=1.234.1-r0
-# Fix: Pin uvloop and fail the image build if installation fails.
-RUN python3 -m pip install --no-cache-dir --break-system-packages "uvloop==0.23.0"
+# Fix: Install uvloop, then remove pip from the final runtime image.
+RUN apk add --no-cache py3-pip=26.1.2-r0 && \
+    python3 -m pip install --no-cache-dir --break-system-packages "uvloop==0.23.0" && \
+    apk del py3-pip && \
+    python3 -c "import uvloop"
 
 RUN mkdir -p /etc/dropbear /var/log/supervisor /etc/x-sorcerer /run/nginx && \
     cp /usr/share/zoneinfo/Asia/Manila /etc/localtime && \
