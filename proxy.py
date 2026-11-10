@@ -289,7 +289,27 @@ async def _handle_client(client_reader, client_writer, session_id, session_stats
             client_writer.close()
             return
 
-        header_lines = raw[:header_end - 4].split(b"\r\n")[1:]
+        request_lines = raw[:header_end - 4].split(b"\r\n")
+        request_parts = request_lines[0].split() if request_lines else []
+        request_path = request_parts[1] if len(request_parts) >= 2 else b""
+        header_lines = request_lines[1:]
+        leftover = raw[header_end:]
+
+        # Handle health probes without requiring a WebSocket upgrade or SSH backend.
+        if request_path in (b"/health", b"/healthz"):
+            session_stats["end_reason"] = "healthcheck_200"
+            client_writer.write(
+                b"HTTP/1.1 200 OK\r\n"
+                b"Content-Type: text/plain\r\n"
+                b"Content-Length: 3\r\n"
+                b"Connection: close\r\n"
+                b"\r\n"
+                b"OK\n"
+            )
+            await client_writer.drain()
+            client_writer.close()
+            return
+
         websocket_upgrade = any(
             name.strip().lower() == b"upgrade"
             and separator
@@ -301,22 +321,8 @@ async def _handle_client(client_reader, client_writer, session_id, session_stats
                 line.partition(b":") for line in header_lines
             )
         )
-        leftover = raw[header_end:]
 
-        if websocket_upgrade:
-             # Generate a Date header dynamically for each fake-101 response.
-             date_str = formatdate(timeval=None, localtime=False, usegmt=True)
-             client_writer.write(
-                 b"HTTP/1.1 101 Switching Protocols\r\n"
-                 b"Upgrade: websocket\r\n"
-                 b"Connection: keep-alive, Upgrade\r\n"
-                 b"Date: " + date_str.encode() + b"\r\n"
-                 b"Server: Google Frontend\r\n"
-                 b"X-Powered-By: X-Sorcerer\r\n"
-                 b"\r\n"
-             )
-             await client_writer.drain()
-        else:
+        if not websocket_upgrade:
             session_stats["end_reason"] = "http_403_no_websocket_upgrade"
             logging.info("No websocket upgrade header found, sending 403 and dropping")
             client_writer.write(
@@ -329,6 +335,49 @@ async def _handle_client(client_reader, client_writer, session_id, session_stats
             client_writer.close()
             return
 
+        # Establish the SSH backend before acknowledging the WebSocket upgrade.
+        ssh_connect_started = time.monotonic()
+        try:
+            ssh_reader, ssh_writer = await asyncio.wait_for(
+                asyncio.open_connection("127.0.0.1", SSH_PORT, limit=BUF_SIZE),
+                timeout=2.0
+            )
+            session_stats["ssh_connect_ms"] = round(
+                (time.monotonic() - ssh_connect_started) * 1000.0, 1
+            )
+        except Exception as e:
+            session_stats["end_reason"] = "ssh_connect_error:" + type(e).__name__
+            session_stats["ssh_connect_ms"] = round(
+                (time.monotonic() - ssh_connect_started) * 1000.0, 1
+            )
+            logging.error(f"Could not reach dropbear on 127.0.0.1:{SSH_PORT}: {e!r}")
+            client_writer.write(
+                b"HTTP/1.1 502 Bad Gateway\r\n"
+                b"Content-Length: 0\r\n"
+                b"Connection: close\r\n"
+                b"\r\n"
+            )
+            await client_writer.drain()
+            client_writer.close()
+            return
+
+        # Send the fake-101 response only after Dropbear accepts the TCP connection.
+        date_str = formatdate(timeval=None, localtime=False, usegmt=True)
+        client_writer.write(
+            b"HTTP/1.1 101 Switching Protocols\r\n"
+            b"Upgrade: websocket\r\n"
+            b"Connection: keep-alive, Upgrade\r\n"
+            b"Date: " + date_str.encode() + b"\r\n"
+            b"Server: Google Frontend\r\n"
+            b"X-Powered-By: X-Sorcerer\r\n"
+            b"\r\n"
+        )
+        try:
+            await client_writer.drain()
+        except Exception:
+            ssh_writer.close()
+            await asyncio.gather(ssh_writer.wait_closed(), return_exceptions=True)
+            raise
 
     except asyncio.TimeoutError:
         session_stats["end_reason"] = "handshake_timeout"
@@ -338,17 +387,6 @@ async def _handle_client(client_reader, client_writer, session_id, session_stats
     except Exception as e:
         session_stats["end_reason"] = "handshake_error:" + type(e).__name__
         logging.error(f"Handshake error: {e!r}")
-        client_writer.close()
-        return
-
-    ssh_connect_started = time.monotonic()
-    try:
-        ssh_reader, ssh_writer = await asyncio.open_connection("127.0.0.1", SSH_PORT, limit=BUF_SIZE)
-        session_stats["ssh_connect_ms"] = round((time.monotonic() - ssh_connect_started) * 1000.0, 1)
-    except Exception as e:
-        session_stats["end_reason"] = "ssh_connect_error:" + type(e).__name__
-        session_stats["ssh_connect_ms"] = round((time.monotonic() - ssh_connect_started) * 1000.0, 1)
-        logging.error(f"Could not reach dropbear on 127.0.0.1:{SSH_PORT}: {e!r}")
         client_writer.close()
         return
 
