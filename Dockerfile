@@ -84,6 +84,7 @@ RUN mkdir -p /etc/dropbear /var/log/supervisor /etc/x-sorcerer /run/nginx && \
     echo "Asia/Manila" > /etc/timezone
 
 COPY banner.txt /etc/x-sorcerer/banner.txt
+RUN test "$(wc -c < /etc/x-sorcerer/banner.txt)" -le 4096
 COPY proxy.py /etc/x-sorcerer/proxy.py
 COPY supervisord.conf /etc/supervisord.conf
 COPY nginx.conf.template /etc/x-sorcerer/nginx.conf.template
