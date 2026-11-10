@@ -23,6 +23,8 @@ RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2 && \
     cd dropbear-2026.94 && \
     grep -Fq '#define LOCAL_IDENT "SSH-2.0-dropbear" IDENT_VERSION_PART' src/sysoptions.h && \
     sed -i 's|#define LOCAL_IDENT "SSH-2.0-dropbear" IDENT_VERSION_PART|#define LOCAL_IDENT "SSH-2.0-" DROPBEAR_VERSION|' src/sysoptions.h && \
+    sed -i 's|^#define MAX_BANNER_SIZE [0-9]*|#define MAX_BANNER_SIZE 4096|' src/sysoptions.h && \
+    grep -Fq '#define MAX_BANNER_SIZE 4096' src/sysoptions.h && \
     printf '%s\n' \
       '#define DROPBEAR_VERSION "OpenSSH_10.6p2 Ubuntu-2ubuntu3.6"' \
       '#define DROPBEAR_SMALL_CODE 0' \
