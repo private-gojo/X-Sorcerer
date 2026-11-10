@@ -14,13 +14,17 @@ fi
 if [ -n "$ACCOUNTS" ]; then
     IFS=',' read -ra ADDR <<< "$ACCOUNTS"
     for i in "${ADDR[@]}"; do
-        USER=$(echo "$i" | cut -d: -f1)
-        PASS=$(echo "$i" | cut -d: -f2)
-        adduser -D -s /bin/false "$USER"
+        USER=${i%%:*}
+        PASS=${i#*:}
+        if ! id -u "$USER" >/dev/null 2>&1; then
+            adduser -D -s /bin/false "$USER"
+        fi
         echo "$USER:$PASS" | chpasswd
     done
 else
-    adduser -D -s /bin/false gojo
+    if ! id -u gojo >/dev/null 2>&1; then
+        adduser -D -s /bin/false gojo
+    fi
     echo "gojo:gojo" | chpasswd
 fi
 
@@ -30,6 +34,9 @@ if [ ! -f /etc/dropbear/dropbear_rsa_host_key ]; then
 fi
 if [ ! -f /etc/dropbear/dropbear_ecdsa_host_key ]; then
     dropbearkey -t ecdsa -f /etc/dropbear/dropbear_ecdsa_host_key -s 521
+fi
+if [ ! -f /etc/dropbear/dropbear_ed25519_host_key ]; then
+    dropbearkey -t ed25519 -f /etc/dropbear/dropbear_ed25519_host_key
 fi
 
 # I substitute Cloud Run's injected PORT into my nginx template.
