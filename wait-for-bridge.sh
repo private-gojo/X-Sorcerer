@@ -2,9 +2,8 @@
 
 # =========================
 # WAIT-FOR-BRIDGE
-# Prevents nginx from starting before the Python bridge (proxy.py)
-# is ready on port 8081. Fixes the startup race condition where
-# nginx tries to proxy to 127.0.0.1:8081 before it's listening.
+# Prevents nginx from starting before both the Python bridge
+# (127.0.0.1:8081) and Dropbear backend (127.0.0.1:2224) are ready.
 # =========================
 
 MAX_RETRIES=30
