@@ -52,9 +52,9 @@ RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2 && \
       '#define DROPBEAR_SNTRUP761 1' \
       '#define DROPBEAR_MLKEM768 1' \
       '#define DROPBEAR_ECDH 1' \
-      '#define DROPBEAR_DH_GROUP1 0' \\
-      '#define MAX_UNAUTH_PER_IP 512' \\
-      '#define MAX_UNAUTH_CLIENTS 512' \\
+      '#define DROPBEAR_DH_GROUP1 0' \
+      '#define MAX_UNAUTH_PER_IP 512' \
+      '#define MAX_UNAUTH_CLIENTS 512' \
       '#define AUTH_TIMEOUT 60' > localoptions.h && \
     ./configure && \
     make PROGRAMS="dropbear dropbearkey" && \
